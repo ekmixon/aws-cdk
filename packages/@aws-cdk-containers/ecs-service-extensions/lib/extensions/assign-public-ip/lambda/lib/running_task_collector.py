@@ -17,8 +17,8 @@ class RunningTaskCollector:
 
     def __init__(self, ec2_client, reference_record: DdbRecord):
         self.ec2_client = ec2_client
-        self.tasks = list()
-        self.enis_by_id = dict()
+        self.tasks = []
+        self.enis_by_id = {}
         self.reference_record = reference_record
 
     def collect(self, task_info):
@@ -50,8 +50,7 @@ class RunningTaskCollector:
 
         eni_ids = list(self.enis_by_id.keys())
         for page in paginator.paginate(NetworkInterfaceIds=eni_ids):
-            for eni in page['NetworkInterfaces']:
-                yield eni
+            yield from page['NetworkInterfaces']
 
     def get_ips(self):
         return [eni.public_ipv4 for eni in self.enis_by_id.values()]

@@ -24,18 +24,16 @@ def is_complete(event, ctx):
   object_key = props['ObjectKey']
   expected_content = props['ExpectedContent']
 
-  print("reading content from s3://%s/%s" % (bucket_name, object_key))
+  print(f"reading content from s3://{bucket_name}/{object_key}")
   content = None
   try:
     result = s3.get_object(Bucket=bucket_name, Key=object_key)
     content = result['Body'].read().decode('utf-8')
   except s3.exceptions.NoSuchKey:
     print("file not found")
-    pass
+  print(f"actual content: {content}")
+  print(f"expected content: {expected_content}")
 
-  print("actual content: %s" % content)
-  print("expected content: %s" % expected_content)
-  
   is_equal = content == expected_content
 
   if is_equal:

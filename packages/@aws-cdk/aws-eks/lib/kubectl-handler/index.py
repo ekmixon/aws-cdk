@@ -22,4 +22,4 @@ def handler(event, context):
   if resource_type == 'Custom::AWSCDK-EKS-KubernetesObjectValue':
     return get_handler(event, context)
 
-  raise Exception("unknown resource type %s" % resource_type)
+  raise Exception(f"unknown resource type {resource_type}")

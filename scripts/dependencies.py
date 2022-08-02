@@ -40,16 +40,13 @@ def package_jsons():
 
 
 def find(xs, x):
-  for i, value in enumerate(xs):
-    if x == value:
-      return i
-  return None
+  return next((i for i, value in enumerate(xs) if x == value), None)
 
 
 def print_graph(graph):
   for package, deps in graph.items():
     for dep in deps:
-      print('%s -> %s' % (package, dep))
+      print(f'{package} -> {dep}')
 
   checked = set()
 
@@ -59,7 +56,7 @@ def print_graph(graph):
     i = find(path, package)
     if i is not None:
       cycle = path[i:] + [package]
-      print('Cycle: %s' % ' => '.join(cycle))
+      print(f"Cycle: {' => '.join(cycle)}")
       return
 
     if package in checked:

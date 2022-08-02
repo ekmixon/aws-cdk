@@ -60,17 +60,19 @@ class RecordsTableAccessor:
         Retries putting tasks into the table record with optimistic locking.
         """
 
-        for attempt in range(0, self.max_attempts):
+        for attempt in range(self.max_attempts):
             try:
                 logging.info(f'Attempting to put the task optimistically (attempt {attempt+1})')
                 return self.put_update_optimistically(key=key, update=update)
             except ClientError as e:
-                if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
-                    logging.info(f'Check condition was rejected')
-                    continue
-                else:
+                if (
+                    e.response['Error']['Code']
+                    != 'ConditionalCheckFailedException'
+                ):
                     raise
 
+                logging.info('Check condition was rejected')
+                continue
         # Ran out of retries!!
         raise Exception('Exceeded maximum retries while optimistically putting changes')
 
@@ -84,10 +86,10 @@ class RecordsTableAccessor:
 
         if len(response['Items']) > 0:
             # Decode a pre-existing record
-            logging.info(f'Found a pre-existing record')
+            logging.info('Found a pre-existing record')
             return self.ddb_record_encoding.decode(response['Items'][0])
         else:
-            logging.info(f'Creating a new record')
+            logging.info('Creating a new record')
             # Create a new record
             return DdbRecord(key=key)
 
@@ -175,8 +177,6 @@ def update_ddb_record(ddb_record: DdbRecord, update: RecordUpdate) -> DdbRecord:
                 # Stored task already marked as stopped, so the received task is a
                 # duplicate. Ignore it.
                 logging.info(f'Received {task_arn} which was already STOPPED. Ignoring.')
-                pass
-
         else:
             # Stopped task isn't in the task list, so we've received an out-of-order
             # STOPPED transition. We don't know this task, but we know that if we
@@ -212,4 +212,4 @@ def task_info_has_expired(task_info: TaskInfo):
         return False
 
     stopped_marker_age = datetime.utcnow() - task_info.stopped_datetime
-    return True if stopped_marker_age > STOPPED_MARKER_EXPIRATION else False
+    return stopped_marker_age > STOPPED_MARKER_EXPIRATION

@@ -24,7 +24,7 @@ class Route53RecordSetLocator:
         return self.__str__() < other.__str__()
 
     def get_dot_suffixed_name(self):
-        return self.record_name + '.'
+        return f'{self.record_name}.'
 
     def matches_record_set(self, record_set):
         return record_set['Name'] == self.get_dot_suffixed_name()
@@ -49,7 +49,7 @@ class Route53RecordSetAccessor:
         else:
             logging.info('Creating a new record set')
 
-        if len(ipv4s) > 0:
+        if ipv4s:
             record_set['ResourceRecords'] = map_ips_to_resource_records(ipv4s)
             retry_with_backoff(lambda: self.request_upsert(locator, record_set))
         elif not is_new:
@@ -64,8 +64,9 @@ class Route53RecordSetAccessor:
                                                                StartRecordType=record_type, MaxItems="1")
 
         logging.info(f'Query result: {result}')
-        existing_record_set = find_locator_record_set(locator, record_type, result['ResourceRecordSets'])
-        if existing_record_set:
+        if existing_record_set := find_locator_record_set(
+            locator, record_type, result['ResourceRecordSets']
+        ):
             return existing_record_set, False
         else:
             return {
@@ -96,13 +97,13 @@ class Route53RecordSetAccessor:
         record_set, is_new = retry_with_backoff(lambda: self.get_record_set(locator))
 
         if not is_new:
-            logging.info(f'Found a record set')
+            logging.info('Found a record set')
             retry_with_backoff(lambda: self.request_delete(locator, record_set))
             logging.info(f'Deleted record set {record_set}')
             return True
 
         else:
-            logging.info(f'Did not find a record set, so no deletion needed')
+            logging.info('Did not find a record set, so no deletion needed')
             return False
 
     def exists(self, locator: Route53RecordSetLocator):
@@ -131,7 +132,7 @@ def exponential_backoff(attempt: int):
 
 
 def retry_with_backoff(call: Callable, attempts=5, backoff=exponential_backoff):
-    for attempt in range(0, attempts):
+    for attempt in range(attempts):
         try:
             return call()
 
@@ -155,13 +156,17 @@ def retry_with_backoff(call: Callable, attempts=5, backoff=exponential_backoff):
 
 def map_ips_to_resource_records(ips: Set[str]):
     # Take up to the first 400 ips after sorting as the max recordset record quota is 400
-    ips_sorted_limited = sorted(ips)[0:400]
+    ips_sorted_limited = sorted(ips)[:400]
     return [{'Value': ip} for ip in ips_sorted_limited]
 
 
 def find_locator_record_set(locator: Route53RecordSetLocator, record_type: str, record_sets: list):
-    for record_set in record_sets:
-        if locator.matches_record_set(record_set) and record_set['Type'] == record_type:
-            return record_set
-
-    return None
+    return next(
+        (
+            record_set
+            for record_set in record_sets
+            if locator.matches_record_set(record_set)
+            and record_set['Type'] == record_type
+        ),
+        None,
+    )

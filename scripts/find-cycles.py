@@ -5,10 +5,7 @@ import collections
 import pprint
 
 def find(xs, x):
-  for i, value in enumerate(xs):
-    if x == value:
-      return i
-  return None
+  return next((i for i, value in enumerate(xs) if x == value), None)
 
 filenames = sys.argv[1:]
 
@@ -30,7 +27,7 @@ def check_for_cycles(package, path):
   i = find(path, package)
   if i is not None:
     cycle = path[i:] + [package]
-    print('Cycle: %s' % ' => '.join(cycle))
+    print(f"Cycle: {' => '.join(cycle)}")
     return
 
   if package in checked:

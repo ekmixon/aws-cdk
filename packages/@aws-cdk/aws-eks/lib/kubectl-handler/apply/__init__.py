@@ -46,7 +46,7 @@ def apply_handler(event, context):
     with open(manifest_file, "w") as f:
         f.writelines(map(lambda obj: json.dumps(obj), manifest_list))
 
-    logger.info("manifest written to: %s" % manifest_file)
+    logger.info(f"manifest written to: {manifest_file}")
 
     kubectl_opts = []
     if skip_validation:
@@ -71,7 +71,7 @@ def apply_handler(event, context):
         try:
             kubectl('delete', manifest_file)
         except Exception as e:
-            logger.info("delete error: %s" % e)
+            logger.info(f"delete error: {e}")
 
 
 def kubectl(verb, file, *opts):
@@ -84,11 +84,10 @@ def kubectl(verb, file, *opts):
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             output = exc.output
-            if b'i/o timeout' in output and retry > 0:
-                retry = retry - 1
-                logger.info("kubectl timed out, retries left: %s" % retry)
-            else:
+            if b'i/o timeout' not in output or retry <= 0:
                 raise Exception(output)
+            retry -= 1
+            logger.info(f"kubectl timed out, retries left: {retry}")
         else:
             logger.info(output)
             return

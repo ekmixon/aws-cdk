@@ -16,8 +16,7 @@ except ImportError:
 
 
 def main():
-  args = sys.argv[1:]
-  if args:
+  if args := sys.argv[1:]:
     files = [open(filename) for filename in args]
   else:
     files = [sys.stdin]
@@ -138,9 +137,7 @@ def parse_reference(obj):
   keys = list(obj.keys())
   if keys == ['Ref']:
     return (obj[keys[0]], 'Ref')
-  if keys == ['Fn::GetAtt']:
-    return (obj[keys[0]][0], obj[keys[0]][1])
-  return None
+  return (obj[keys[0]][0], obj[keys[0]][1]) if keys == ['Fn::GetAtt'] else None
 
 
 

@@ -15,40 +15,42 @@ def lambda_handler(event, context):
     return
 
   instance_arn = container_instance_arn(cluster, instance_id)
-  print('Instance %s has container instance ARN %s' % (lifecycle_event['EC2InstanceId'], instance_arn))
+  print(
+      f"Instance {lifecycle_event['EC2InstanceId']} has container instance ARN {instance_arn}"
+  )
 
   if not instance_arn:
     return
 
   task_arns = container_instance_task_arns(cluster, instance_arn)
-  
+
   if task_arns:
-    print('Instance ARN %s has task ARNs %s' % (instance_arn, ', '.join(task_arns)))
+    print(f"Instance ARN {instance_arn} has task ARNs {', '.join(task_arns)}")
 
   while has_tasks(cluster, instance_arn, task_arns):
     time.sleep(10)
 
   try:
-    print('Terminating instance %s' % instance_id)
+    print(f'Terminating instance {instance_id}')
     autoscaling.complete_lifecycle_action(
         LifecycleActionResult='CONTINUE',
         **pick(lifecycle_event, 'LifecycleHookName', 'LifecycleActionToken', 'AutoScalingGroupName'))
   except Exception as e:
     # Lifecycle action may have already completed.
-    print(str(e))
+    print(e)
 
 
 def container_instance_arn(cluster, instance_id):
   """Turn an instance ID into a container instance ARN."""
-  arns = ecs.list_container_instances(cluster=cluster, filter='ec2InstanceId==' + instance_id)['containerInstanceArns']
-  if not arns:
-    return None
-  return arns[0]
+  arns = ecs.list_container_instances(
+      cluster=cluster,
+      filter=f'ec2InstanceId=={instance_id}')['containerInstanceArns']
+  return arns[0] if arns else None
 
 def container_instance_task_arns(cluster, instance_arn):
   """Fetch tasks for a container instance ARN."""
-  arns = ecs.list_tasks(cluster=cluster, containerInstance=instance_arn)['taskArns']
-  return arns
+  return ecs.list_tasks(
+      cluster=cluster, containerInstance=instance_arn)['taskArns']
 
 def has_tasks(cluster, instance_arn, task_arns):
   """Return True if the instance is running tasks for the given cluster."""
@@ -65,17 +67,15 @@ def has_tasks(cluster, instance_arn, task_arns):
   task_count = None
 
   if task_arns:
-    # Fetch details for tasks running on the container instance
-    tasks = ecs.describe_tasks(cluster=cluster, tasks=task_arns)['tasks']
-    if tasks:
+    if tasks := ecs.describe_tasks(cluster=cluster, tasks=task_arns)['tasks']:
       # Consider any non-stopped tasks as running
       task_count = sum(task['lastStatus'] != 'STOPPED' for task in tasks) + instance['pendingTasksCount']
-  
+
   if not task_count:
     # Fallback to instance task counts if detailed task information is unavailable
     task_count = instance['runningTasksCount'] + instance['pendingTasksCount']
-    
-  print('Instance %s has %s tasks' % (instance_arn, task_count))
+
+  print(f'Instance {instance_arn} has {task_count} tasks')
 
   return task_count > 0
 

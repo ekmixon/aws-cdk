@@ -21,7 +21,7 @@ CFN_FAILED = "FAILED"
 def handler(event, context):
 
     def cfn_error(message=None):
-        logger.error("| cfn_error: %s" % message)
+        logger.error(f"| cfn_error: {message}")
         cfn_send(event, context, CFN_FAILED, reason=message)
 
     try:
@@ -41,7 +41,7 @@ def handler(event, context):
         if cluster_name is None:
             cfn_error("CLUSTER_NAME is missing in environment")
             return
-        
+
         subprocess.check_call([ 'aws', 'eks', 'update-kubeconfig',
             '--name', cluster_name,
             '--kubeconfig', kubeconfig
@@ -49,24 +49,24 @@ def handler(event, context):
 
         # Write out the values to a file and include them with the install and upgrade
         values_file = None
-        if not request_type == "Delete" and not values_text is None:
+        if request_type != "Delete" and values_text is not None:
             values = json.loads(values_text)
             values_file = os.path.join(outdir, 'values.yaml')
             with open(values_file, "w") as f:
                 f.write(json.dumps(values, indent=2))
 
-        if request_type == 'Create' or request_type == 'Update':
+        if request_type in ['Create', 'Update']:
             helm('upgrade', release, chart, repository, values_file, namespace, version)
         elif request_type == "Delete":
             try:
                 helm('uninstall', release, namespace=namespace)
             except Exception as e:
-                logger.info("delete error: %s" % e)
+                logger.info(f"delete error: {e}")
 
         # if we are creating a new resource, allocate a physical id for it
         # otherwise, we expect physical id to be relayed by cloudformation
         if request_type == 'Create':
-            physical_id = "%s/%s" % (cluster_name, str(uuid4()))
+            physical_id = f"{cluster_name}/{str(uuid4())}"
         else:
             if not physical_id:
                 cfn_error("invalid request: request type is '%s' but 'PhysicalResourceId' is not defined" % request_type)
@@ -85,17 +85,17 @@ def helm(verb, release, chart = None, repo = None, file = None, namespace = None
     import subprocess
     try:
         cmnd = ['helm', verb, release]
-        if not chart is None:
+        if chart is not None:
             cmnd.append(chart)
         if verb == 'upgrade':
             cmnd.append('--install')
-        if not repo is None:
+        if repo is not None:
             cmnd.extend(['--repo', repo])
-        if not file is None:
+        if file is not None:
             cmnd.extend(['--values', file])
-        if not version is None:
+        if version is not None:
             cmnd.extend(['--version', version])
-        if not namespace is None:
+        if namespace is not None:
             cmnd.extend(['--namespace', namespace])
         cmnd.extend(['--kubeconfig', kubeconfig])
         output = subprocess.check_output(cmnd, stderr=subprocess.STDOUT, cwd=outdir)
@@ -110,15 +110,17 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
     responseUrl = event['ResponseURL']
     logger.info(responseUrl)
 
-    responseBody = {}
-    responseBody['Status'] = responseStatus
-    responseBody['Reason'] = reason or ('See the details in CloudWatch Log Stream: ' + context.log_stream_name)
-    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-    responseBody['StackId'] = event['StackId']
-    responseBody['RequestId'] = event['RequestId']
-    responseBody['LogicalResourceId'] = event['LogicalResourceId']
-    responseBody['NoEcho'] = noEcho
-    responseBody['Data'] = responseData
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': reason
+        or f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': noEcho,
+        'Data': responseData,
+    }
 
     body = json.dumps(responseBody)
     logger.info("| response body:\n" + body)
@@ -130,7 +132,7 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
 
     try:
         response = requests.put(responseUrl, data=body, headers=headers)
-        logger.info("| status code: " + response.reason)
+        logger.info(f"| status code: {response.reason}")
     except Exception as e:
         logger.error("| unable to send response to CloudFormation")
         logger.exception(e)

@@ -42,7 +42,7 @@ def update_package_json(package_json_path, packages, command):
 
 
 def update_dependencies(package_json, dependency_key, local_packages, command):
-  backup_key = 'BACKUP_' + dependency_key
+  backup_key = f'BACKUP_{dependency_key}'
 
   if command in ['links', 'hide']:
     # Save a backup
@@ -51,9 +51,7 @@ def update_dependencies(package_json, dependency_key, local_packages, command):
 
     deps = package_json.get(dependency_key, {})
     for key in list(deps.keys()):
-      local_package = local_packages.get(key)
-
-      if local_package:
+      if local_package := local_packages.get(key):
         if command == 'links':
           deps[key] = 'file:' + local_package['location']
         elif command =='hide':

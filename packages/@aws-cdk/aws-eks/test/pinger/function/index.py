@@ -10,11 +10,11 @@ def handler(event, context):
   print(json.dumps(event))
 
   request_type = event['RequestType']
-  props = event['ResourceProperties']
-
-  url = props['Url']
-
   if request_type in ['Create', 'Update']:
+    props = event['ResourceProperties']
+
+    url = props['Url']
+
     logger.info(f'Sending request to {url}')
     # this should a substantial retry because it has to wait for the ELB to actually
     # be functioning

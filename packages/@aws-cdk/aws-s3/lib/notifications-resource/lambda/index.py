@@ -33,9 +33,7 @@ def handler(event: dict, context):
 
 
 def handle_managed(request_type, notification_configuration):
-  if request_type == 'Delete':
-    return {}
-  return notification_configuration
+    return {} if request_type == 'Delete' else notification_configuration
 
 
 def handle_unmanaged(bucket, stack_id, request_type, notification_configuration):
@@ -61,14 +59,15 @@ def handle_unmanaged(bucket, stack_id, request_type, notification_configuration)
 
 
 def find_external_notifications(bucket, stack_id):
-  existing_notifications = get_bucket_notification_configuration(bucket)
-  external_notifications = {}
-  for t in CONFIGURATION_TYPES:
-    # if the notification was created by us, we know what id to expect
-    # so we can filter by it.
-    external_notifications[t] = [n for n in existing_notifications.get(t, []) if not n['Id'].startswith(f"{stack_id}-")]
-
-  return external_notifications
+    existing_notifications = get_bucket_notification_configuration(bucket)
+    return {
+        t: [
+            n
+            for n in existing_notifications.get(t, [])
+            if not n['Id'].startswith(f"{stack_id}-")
+        ]
+        for t in CONFIGURATION_TYPES
+    }
 
 
 def get_bucket_notification_configuration(bucket):
@@ -96,6 +95,6 @@ def submit_response(event: dict, context, response_status: str, error_message: s
         req = urllib.request.Request(url=event["ResponseURL"], headers=headers, data=response_body, method="PUT")
         with urllib.request.urlopen(req) as response:
             print(response.read().decode("utf-8"))
-        print("Status code: " + response.reason)
+        print(f"Status code: {response.reason}")
     except Exception as e:
-        print("send(..) failed executing request.urlopen(..): " + str(e))
+        print(f"send(..) failed executing request.urlopen(..): {str(e)}")

@@ -23,7 +23,7 @@ kubeconfig = os.path.join(outdir, 'kubeconfig')
 def handler(event, context):
 
     def cfn_error(message=None):
-        logger.error("| cfn_error: %s" % message)
+        logger.error(f"| cfn_error: {message}")
         cfn_send(event, context, CFN_FAILED, reason=message)
 
     try:
@@ -39,7 +39,7 @@ def handler(event, context):
         old_config = old_props.get('Config', {})
 
         def new_cluster_name():
-            return "cluster-%s" % request_id
+            return f"cluster-{request_id}"
 
         logger.info(json.dumps(config))
 
@@ -56,7 +56,7 @@ def handler(event, context):
             elif request_type == 'Create': cluster_name = new_cluster_name()
             else: raise Exception("unexpected error. cannot determine cluster name")
         config['name'] = cluster_name
-        logger.info("request: %s" % config)
+        logger.info(f"request: {config}")
 
         # extract additional options
         resourcesVpcConfig = config.get('resourcesVpcConfig', None)
@@ -64,7 +64,7 @@ def handler(event, context):
         version = config.get('version', None)
 
         def should_replace_cluster():
-            logger.info("old config: %s" % json.dumps(old_config))
+            logger.info(f"old config: {json.dumps(old_config)}")
 
             old_name = physical_id
             if old_name != cluster_name:
@@ -75,12 +75,12 @@ def handler(event, context):
             if old_resourcesVpcConfig != resourcesVpcConfig:
                 logger.info("'resourcesVpcConfig' change requires replacement (old=%s, new=%s)" % (old_resourcesVpcConfig, resourcesVpcConfig))
                 return True
-            
+
             old_roleArn = old_config.get('roleArn', None)
             if old_roleArn != roleArn:
                 logger.info("'roleArn' change requires replacement (old=%s, new=%s)" % (old_roleArn, roleArn))
                 return True
-            
+
             return False
 
         # delete is a special case
@@ -94,12 +94,12 @@ def handler(event, context):
             return
 
         if request_type == 'Create':
-            logger.info("creating cluster %s" % cluster_name)
+            logger.info(f"creating cluster {cluster_name}")
             resp = eks.create_cluster(**config)
-            logger.info("create response: %s" % resp)
+            logger.info(f"create response: {resp}")
         elif request_type == 'Update':
             # physical_id is always defined for "update"
-            logger.info("updating cluster %s" % physical_id)
+            logger.info(f"updating cluster {physical_id}")
             current_state = eks.describe_cluster(name=physical_id)['cluster']
 
             # changes to "name", "resourcesVpcConfig" and "roleArn" all require replacement
@@ -112,9 +112,12 @@ def handler(event, context):
                     cluster_name = new_cluster_name()
                     config['name'] = cluster_name
 
-                logger.info("replacing cluster %s with a new cluster %s" % (physical_id, cluster_name))
+                logger.info(
+                    f"replacing cluster {physical_id} with a new cluster {cluster_name}"
+                )
+
                 resp = eks.create_cluster(**config)
-                logger.info("create (replacement) response: %s" % resp)
+                logger.info(f"create (replacement) response: {resp}")
             else:
                 # version change - we can do that without replacement
                 old_version = old_config.get('version', None)
@@ -124,12 +127,15 @@ def handler(event, context):
                     old_version_actual = current_state['version']
                     if version != old_version_actual:
                         if version is None:
-                            raise Exception("Version cannot be changed from a specific value (%s) to undefined" % old_version)
+                            raise Exception(
+                                f"Version cannot be changed from a specific value ({old_version}) to undefined"
+                            )
+
 
                         resp = eks.update_cluster_version(name=cluster_name,version=version)
-                        logger.info("update response: %s" % resp)
+                        logger.info(f"update response: {resp}")
         else:
-            raise Exception("Invalid request type %s" % request_type)
+            raise Exception(f"Invalid request type {request_type}")
 
         # wait for the cluster to become active (13min timeout)
         logger.info('waiting for cluster to become active...')
@@ -140,14 +146,14 @@ def handler(event, context):
         })
 
         resp = eks.describe_cluster(name=cluster_name)
-        logger.info("describe response: %s" % resp)
+        logger.info(f"describe response: {resp}")
         attrs = {
             'Name': resp['cluster']['name'],
             'Endpoint': resp['cluster']['endpoint'],
             'Arn': resp['cluster']['arn'],
             'CertificateAuthorityData': resp['cluster']['certificateAuthority']['data']
         }
-        logger.info("attributes: %s" % attrs)
+        logger.info(f"attributes: {attrs}")
         cfn_send(event, context, CFN_SUCCESS, responseData=attrs, physicalResourceId=cluster_name)
 
     except:
@@ -170,15 +176,17 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
     # will result in resource replacement
     physicalResourceId = physicalResourceId or event.get('PhysicalResourceId', context.log_stream_name)
 
-    responseBody = {}
-    responseBody['Status'] = responseStatus
-    responseBody['Reason'] = reason or ('See the details in CloudWatch Log Stream: ' + context.log_stream_name)
-    responseBody['PhysicalResourceId'] = physicalResourceId
-    responseBody['StackId'] = event['StackId']
-    responseBody['RequestId'] = event['RequestId']
-    responseBody['LogicalResourceId'] = event['LogicalResourceId']
-    responseBody['NoEcho'] = noEcho
-    responseBody['Data'] = responseData
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': reason
+        or f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': noEcho,
+        'Data': responseData,
+    }
 
     body = json.dumps(responseBody)
     logger.info("| response body:\n" + body)
@@ -190,7 +198,7 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
 
     try:
         response = requests.put(responseUrl, data=body, headers=headers)
-        logger.info("| status code: " + response.reason)
+        logger.info(f"| status code: {response.reason}")
     except Exception as e:
         logger.error("| unable to send response to CloudFormation")
         logger.exception(e)

@@ -25,5 +25,3 @@ class TestQueueHandler(unittest.TestCase):
 
         # THEN
         dynamodb_resource.Table.called_width('RECORDS_TABLE')
-
-        pass

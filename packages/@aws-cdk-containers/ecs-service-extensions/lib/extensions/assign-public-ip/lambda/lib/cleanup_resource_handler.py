@@ -37,15 +37,13 @@ class CleanupResourceHandler:
         locator = Route53RecordSetLocator(hosted_zone_id=resource_properties.HostedZoneId,
                                           record_name=resource_properties.RecordName)
 
-        deleted = self.record_set_accessor.delete(locator=locator)
-
-        if deleted:
-            logging.info(f'Monitoring for the record deletion')
-            for interval_number in range(1, 10):
+        if deleted := self.record_set_accessor.delete(locator=locator):
+            logging.info('Monitoring for the record deletion')
+            for _ in range(1, 10):
                 if not self.record_set_accessor.exists(locator):
-                    logging.info(f'The record has been deleted')
+                    logging.info('The record has been deleted')
                     return
                 else:
-                    logging.info(f'The record still exists')
+                    logging.info('The record still exists')
                     if self.monitor_interval > 0:
                         time.sleep(self.monitor_interval)

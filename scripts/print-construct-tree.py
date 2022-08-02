@@ -28,17 +28,16 @@ def print_tree(tree_file):
 
 def print_node(node, prefix_here='', prefix_children=''):
   info = []
-  cfn_type = node.get('attributes', {}).get('aws:cdk:cloudformation:type')
-  if cfn_type:
+  if cfn_type := node.get('attributes', {}).get('aws:cdk:cloudformation:type'):
     info.append(cfn_type)
 
   print(prefix_here + node['id'] + (('  (' + ', '.join(info) + ')') if info else ''))
   children = list(node.get('children', {}).values())
   for i, child in enumerate(children):
     if i < len(children) - 1:
-      print_node(child, prefix_children + ' ├─ ', prefix_children + ' │  ')
+      print_node(child, f'{prefix_children} ├─ ', f'{prefix_children} │  ')
     else:
-      print_node(child, prefix_children + ' └─ ', prefix_children + '    ')
+      print_node(child, f'{prefix_children} └─ ', f'{prefix_children}    ')
 
 
 if __name__ == '__main__':

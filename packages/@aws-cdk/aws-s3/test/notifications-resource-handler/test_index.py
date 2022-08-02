@@ -45,17 +45,11 @@ def make_notification_configuration(id_prefix: str = None):
 
 
 def make_empty_notification_configuration():
-    config = {}
-    for t in CONFIGURATION_TYPES:
-        config[t] = []
-    return config
+    return {t: [] for t in CONFIGURATION_TYPES}
 
 
 def merge_notification_configurations(conf1: Dict, conf2: Dict):
-    notifications = {}
-    for t in CONFIGURATION_TYPES:
-        notifications[t] = conf1.get(t, []) + conf2.get(t, [])
-    return notifications
+    return {t: conf1.get(t, []) + conf2.get(t, []) for t in CONFIGURATION_TYPES}
 
 
 class ManagedBucketTest(unittest.TestCase):

@@ -21,7 +21,7 @@ class TestCleanupResourceHandler(unittest.TestCase):
         def exists_side_effect(*args):
             nonlocal exists_count
             exists_count += 1
-            return True if exists_count < 3 else False
+            return exists_count < 3
 
         record_set_accessor.exists = mock.Mock(side_effect=exists_side_effect)
 

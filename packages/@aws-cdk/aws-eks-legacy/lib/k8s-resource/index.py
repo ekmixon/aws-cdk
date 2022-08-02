@@ -21,7 +21,7 @@ CFN_FAILED = "FAILED"
 def handler(event, context):
 
     def cfn_error(message=None):
-        logger.error("| cfn_error: %s" % message)
+        logger.error(f"| cfn_error: {message}")
         cfn_send(event, context, CFN_FAILED, reason=message)
 
     try:
@@ -51,20 +51,20 @@ def handler(event, context):
         with open(manifest_file, "w") as f:
             f.writelines(map(lambda obj: json.dumps(obj), manifest_list))
 
-        logger.info("manifest written to: %s" % manifest_file)
+        logger.info(f"manifest written to: {manifest_file}")
 
-        if request_type == 'Create' or request_type == 'Update':
+        if request_type in ['Create', 'Update']:
             kubectl('apply', manifest_file)
         elif request_type == "Delete":
             try:
                 kubectl('delete', manifest_file)
             except Exception as e:
-                logger.info("delete error: %s" % e)
+                logger.info(f"delete error: {e}")
 
         # if we are creating a new resource, allocate a physical id for it
         # otherwise, we expect physical id to be relayed by cloudformation
         if request_type == 'Create':
-            physical_id = "%s/%s" % (cluster_name, str(uuid4()))
+            physical_id = f"{cluster_name}/{str(uuid4())}"
         else:
             if not physical_id:
                 cfn_error("invalid request: request type is '%s' but 'PhysicalResourceId' is not defined" % request_type)
@@ -97,15 +97,17 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
     responseUrl = event['ResponseURL']
     logger.info(responseUrl)
 
-    responseBody = {}
-    responseBody['Status'] = responseStatus
-    responseBody['Reason'] = reason or ('See the details in CloudWatch Log Stream: ' + context.log_stream_name)
-    responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-    responseBody['StackId'] = event['StackId']
-    responseBody['RequestId'] = event['RequestId']
-    responseBody['LogicalResourceId'] = event['LogicalResourceId']
-    responseBody['NoEcho'] = noEcho
-    responseBody['Data'] = responseData
+    responseBody = {
+        'Status': responseStatus,
+        'Reason': reason
+        or f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+        'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+        'StackId': event['StackId'],
+        'RequestId': event['RequestId'],
+        'LogicalResourceId': event['LogicalResourceId'],
+        'NoEcho': noEcho,
+        'Data': responseData,
+    }
 
     body = json.dumps(responseBody)
     logger.info("| response body:\n" + body)
@@ -117,7 +119,7 @@ def cfn_send(event, context, responseStatus, responseData={}, physicalResourceId
 
     try:
         response = requests.put(responseUrl, data=body, headers=headers)
-        logger.info("| status code: " + response.reason)
+        logger.info(f"| status code: {response.reason}")
     except Exception as e:
         logger.error("| unable to send response to CloudFormation")
         logger.exception(e)

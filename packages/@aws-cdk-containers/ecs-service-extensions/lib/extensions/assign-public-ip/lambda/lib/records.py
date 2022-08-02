@@ -31,7 +31,7 @@ class TaskInfo:
         """
         Check if this task is stopped.
         """
-        return True if self.stopped_datetime is not None else False
+        return self.stopped_datetime is not None
 
 
 @dataclass
@@ -85,14 +85,13 @@ class DdbRecordEncoding:
         return Key(self.PK_NAME).eq(key.to_composite())
 
     def encode(self, record: DdbRecord) -> dict:
-        data = dict()
-        data[self.PK_NAME] = record.key.to_composite()
+        data = {self.PK_NAME: record.key.to_composite()}
         data[self.ATTR_VERSION] = record.version
 
         if len(record.ipv4s) > 0:
             # Sorting only matters here for repeatability in tests, as set ordering
             # isn't easily predictable.
-            data[self.ATTR_IPV4S] = [v for v in sorted(record.ipv4s)]
+            data[self.ATTR_IPV4S] = list(sorted(record.ipv4s))
 
         if len(record.record_sets) > 0:
             data[self.ATTR_RECORD_SETS] = [self.encode_record_set(v) for v in sorted(record.record_sets)]
@@ -112,9 +111,7 @@ class DdbRecordEncoding:
         }
 
     def encode_task_info(self, task_info: TaskInfo) -> dict:
-        data = dict()
-        data[self.ATTR_TASK_ARN] = task_info.task_arn
-
+        data = {self.ATTR_TASK_ARN: task_info.task_arn}
         if task_info.stopped_datetime is not None:
             data[self.ATTR_TASK_STOPPED_DATETIME] = task_info.stopped_datetime.isoformat()
 
@@ -124,8 +121,7 @@ class DdbRecordEncoding:
         return data
 
     def encode_eni_info(self, eni_info: EniInfo) -> dict:
-        data = dict()
-        data[self.ATTR_ENI_ID] = eni_info.eni_id
+        data = {self.ATTR_ENI_ID: eni_info.eni_id}
         if eni_info.public_ipv4 is not None:
             data[self.ATTR_ENI_PUBLIC_IPV4] = eni_info.public_ipv4
 
@@ -135,26 +131,27 @@ class DdbRecordEncoding:
         key = DdbRecordKey.from_composite(data[self.PK_NAME])
         version = int(data[self.ATTR_VERSION])
 
-        ipv4s = set()
-        if self.ATTR_IPV4S in data:
-            ipv4s = {ip for ip in data[self.ATTR_IPV4S]}
-
+        ipv4s = set(data[self.ATTR_IPV4S]) if self.ATTR_IPV4S in data else set()
         record_sets = set()
         if self.ATTR_RECORD_SETS in data:
             for record_set_data in data[self.ATTR_RECORD_SETS]:
                 record_set = self.decode_record_set(record_set_data)
                 record_sets.add(record_set)
 
-        task_info = dict()
+        task_info = {}
         if self.ATTR_TASK_INFO in data:
             task_info = {
                 k: self.decode_task_info(task_info_data)
                 for (k, task_info_data) in data[self.ATTR_TASK_INFO].items()
             }
 
-        record = DdbRecord(key=key, version=version, ipv4s=ipv4s, task_info=task_info, record_sets=record_sets)
-
-        return record
+        return DdbRecord(
+            key=key,
+            version=version,
+            ipv4s=ipv4s,
+            task_info=task_info,
+            record_sets=record_sets,
+        )
 
     def decode_record_set(self, data) -> Route53RecordSetLocator:
         hosted_zone_id = data[self.ATTR_RECORD_SET_ZONE]
